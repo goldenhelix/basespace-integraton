@@ -1,0 +1,83 @@
+name: Download BaseSpace BioSample
+description: |-
+    Download files for a specific BioSample from BaseSpace.
+
+    To get the API token for BaseSpace, follow these steps:
+
+    1. Download the BaseSpace CLI tools. You can find the download link and
+    installation instructions in the [BaseSpace CLI
+    Overview](https://developer.basespace.illumina.com/docs/content/documentation/cli/cli-overview).
+
+    2. After installing the CLI tools, authenticate by running the following
+    command:
+
+        ```sh
+        ./bs auth
+        ```
+
+    3. Retrieve the token from `~/.basespace/default.cfg`. This token will be
+    used as the "BaseSpace API key".
+
+    **Note:** You can do these steps by launching the VSCode app and open
+    *Terminal > New Terminal* to download and run the BaseSpace CLI tools.
+
+agent_requirements:
+  cpu_cores: 1
+  memory_gb: 1
+
+parameters:
+  - name: bio_sample
+    label: BaseSpace BioSample Name
+    type: string
+    value: <your_biosample_name_here>
+
+  - name: output_directory
+    label: Output Directory
+    type: directory
+
+  - name: file_filter
+    label: File Filter
+    type: string
+    value: 'vcf.gz'
+
+  - name: basespace_access_token
+    label: Basespace API Key
+    type: secret
+    value: <your_token_here>
+
+steps:
+  - name: scriptTask
+    description: Test each character
+    type: cmd
+    command: bash
+    args:
+      - |-
+        export BASESPACE_API_SERVER=https://api.basespace.illumina.com
+        export BASESPACE_ACCESS_TOKEN=${basespace_access_token}
+        wget -q "https://launch.basespace.illumina.com/CLI/latest/amd64-linux/bs" -O ./bs
+        chmod u+x ./bs
+
+        set -x
+        ./bs list biosample --filter-term="${bio_sample}" --filter-field="BioSampleName"  -f json  > biosamples.json
+
+        FIRST_BIOSAMPLE=$(jq -r '.[0].Id' biosamples.json)
+        LAST_BIOSAMPLE=$(jq -r '.[-1].Id' biosamples.json)
+        if [ "${FIRST_BIOSAMPLE}" == "null" ]; then
+          echo "No biosamples found"
+          exit 1
+        fi
+        if [ "${FIRST_BIOSAMPLE}" != "${LAST_BIOSAMPLE}" ]; then
+          echo "Multiple biosamples found matching name ${bio_sample}"
+          exit 1
+        fi
+
+        # Don't need all the samples
+        mkdir -p "${output_directory}"
+        if [ -n "${file_filter}" ]; then
+          ./bs download biosample -i ${FIRST_BIOSAMPLE} -o "${output_directory}" --extension="${file_filter}"
+        else
+          ./bs download biosample -i ${FIRST_BIOSAMPLE} -o "${output_directory}"
+        fi
+
+
+
