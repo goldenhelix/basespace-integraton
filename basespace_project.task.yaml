@@ -34,6 +34,7 @@ parameters:
   - name: output_directory
     label: Output Directory
     type: directory
+    supports_location_mode: 'no_append'
 
   - name: file_filter
     label: File Filter
