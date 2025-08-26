@@ -41,24 +41,36 @@ parameters:
     type: string
     value: 'vcf.gz'
 
+  - name: concurrent_files
+    label: Concurrent Files
+    type: integer
+    value: 3
+    help: Maximum number of files to process concurrently during download
+
+  - name: basespace_api_server
+    label: BaseSpace API Server
+    type: string
+    value: "https://api.basespace.illumina.com"
+    help: BaseSpace API server URL
+
   - name: basespace_access_token
     label: Basespace API Key
     type: secret
     value: <your_token_here>
 
 steps:
-  - name: scriptTask
+  - name: bs_download_biosample
     description: Test each character
     type: cmd
     command: bash
     args:
-      - |-
-        export BASESPACE_API_SERVER=https://api.basespace.illumina.com
+      - |- # shell
+        export BASESPACE_API_SERVER=${basespace_api_server}
         export BASESPACE_ACCESS_TOKEN=${basespace_access_token}
         wget -q "https://launch.basespace.illumina.com/CLI/latest/amd64-linux/bs" -O ./bs
         chmod u+x ./bs
 
-        set -x
+        set -eu pipefail
         ./bs list biosample --filter-term="${bio_sample}" --filter-field="BioSampleName"  -f json  > biosamples.json
 
         FIRST_BIOSAMPLE=$(jq -r '.[0].Id' biosamples.json)
@@ -75,10 +87,7 @@ steps:
         # Don't need all the samples
         mkdir -p "${output_directory}"
         if [ -n "${file_filter}" ]; then
-          ./bs download biosample -i ${FIRST_BIOSAMPLE} -o "${output_directory}" --extension="${file_filter}"
+          ./bs download biosample -i ${FIRST_BIOSAMPLE} -o "${output_directory}" --extension="${file_filter}" --concurrent-files="${concurrent_files}" --concurrent-parts=1
         else
-          ./bs download biosample -i ${FIRST_BIOSAMPLE} -o "${output_directory}"
+          ./bs download biosample -i ${FIRST_BIOSAMPLE} -o "${output_directory}" --concurrent-files="${concurrent_files}" --concurrent-parts=1
         fi
-
-
-
